@@ -312,6 +312,18 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         --sleep-recommended-color: var(--success-color, #4caf50);
         --option-height: 56px;
         --option-gap: 6px;
+        /* Intra-card surface: subtle tint relative to the card's own background.
+           rgba fallback for browsers that don't support color-mix. */
+        --_surface: rgba(0, 0, 0, 0.04);
+      }
+      @supports (color: color-mix(in srgb, black 1%, white)) {
+        :host {
+          --_surface: color-mix(
+            in srgb,
+            var(--primary-text-color) 4%,
+            var(--card-background-color, #fff)
+          );
+        }
       }
 
       ha-card {
@@ -378,7 +390,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         align-items: center;
         gap: 12px;
         padding: 12px;
-        background: var(--secondary-background-color, #f5f5f5);
+        background: var(--_surface);
         border-radius: 10px;
       }
 
@@ -427,7 +439,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         padding: 8px 12px;
         font-size: 1.2rem;
         font-family: inherit;
-        background: var(--secondary-background-color, #f5f5f5);
+        background: var(--_surface);
         color: var(--primary-text-color);
         border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
         border-radius: 8px;
@@ -466,7 +478,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         padding: 10px 14px;
         border-radius: 8px;
         border-left: 4px solid transparent;
-        background: var(--secondary-background-color, #f5f5f5);
+        background: var(--_surface);
         /* fixed height so the container calculation is exact */
         height: var(--option-height);
         box-sizing: border-box;
@@ -484,11 +496,11 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
 
       .sleep-option.recommended {
         border-left-color: var(--sleep-recommended-color);
-        background: var(--secondary-background-color, #f5f5f5);
+        background: var(--_surface);
         background: color-mix(
           in srgb,
           var(--sleep-recommended-color) 10%,
-          var(--secondary-background-color, #f5f5f5)
+          var(--_surface)
         );
       }
 
