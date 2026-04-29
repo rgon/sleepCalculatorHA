@@ -7,6 +7,7 @@ import serve from "rollup-plugin-serve";
 import livereload from "rollup-plugin-livereload";
 
 const dev = process.env.ROLLUP_WATCH;
+const port = parseInt(process.env.PORT ?? "8080", 10);
 
 export default {
   input: "src/sleep-calculator-card.ts",
@@ -27,7 +28,7 @@ export default {
         open: true,
         openPage: "/demo.html",
         host: "localhost",
-        port: 8080,
+        port,
         contentBase: ".",
       }),
     dev && livereload({ watch: "sleep-calculator-card.js", port: 35729 }),
