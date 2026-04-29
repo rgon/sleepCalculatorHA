@@ -18,7 +18,8 @@
     "build": "pnpm run clean && pnpm run rollup",
     "clean": "rm -rf dist sleep-calculator-card.js",
     "rollup": "rollup -c",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "serve": "npx serve ."
   },
   "dependencies": {
     "custom-card-helpers": "^2.0.0",

@@ -51,15 +51,29 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
 
   public setConfig(config: SleepCalculatorCardConfig): void {
     if (!config) throw new Error("Invalid configuration");
-    this._config = {
+    const merged: SleepCalculatorCardConfig = {
       time_to_fall_asleep: 15,
       sleep_cycle_length: 90,
       ...config,
     };
+    if (
+      !Number.isFinite(merged.time_to_fall_asleep) ||
+      merged.time_to_fall_asleep! < 0
+    ) {
+      throw new Error("time_to_fall_asleep must be a non-negative number");
+    }
+    if (
+      !Number.isFinite(merged.sleep_cycle_length) ||
+      merged.sleep_cycle_length! <= 0
+    ) {
+      throw new Error("sleep_cycle_length must be a positive number");
+    }
+    this._config = merged;
   }
 
   public getCardSize(): number {
-    return 5;
+    // Header + tab bar + info box + up to 6 option rows + footer ≈ 11 × 50 px rows
+    return 11;
   }
 
   public connectedCallback(): void {
@@ -127,7 +141,11 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
   }
 
   private _fmt(date: Date): string {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
   }
 
   private _fmtDuration(minutes: number): string {
@@ -229,7 +247,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
             <button
               role="tab"
               class="mode-btn ${this._mode === "wakeup" ? "active" : ""}"
-              aria-selected=${this._mode === "wakeup"}
+              aria-selected=${this._mode === "wakeup" ? "true" : "false"}
               @click=${this._onSetModeWakeup}
             >
               <ha-icon icon="mdi:alarm"></ha-icon>
@@ -238,7 +256,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
             <button
               role="tab"
               class="mode-btn ${this._mode === "bedtime" ? "active" : ""}"
-              aria-selected=${this._mode === "bedtime"}
+              aria-selected=${this._mode === "bedtime" ? "true" : "false"}
               @click=${this._onSetModeBedtime}
             >
               <ha-icon icon="mdi:bed-clock"></ha-icon>
@@ -427,6 +445,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
 
       .sleep-option.recommended {
         border-left-color: var(--sleep-recommended-color);
+        background: var(--secondary-background-color, #f5f5f5);
         background: color-mix(
           in srgb,
           var(--sleep-recommended-color) 10%,
