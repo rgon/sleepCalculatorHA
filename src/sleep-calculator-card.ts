@@ -3,6 +3,7 @@ import {
   html,
   css,
   CSSResultGroup,
+  PropertyValues,
   TemplateResult,
   nothing,
 } from "lit";
@@ -89,6 +90,32 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._ticker !== undefined) clearInterval(this._ticker);
+  }
+
+  protected updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+    if (
+      this._mode === "wakeup" &&
+      (changedProperties.has("_mode") || changedProperties.has("_config"))
+    ) {
+      this._scrollToFirstGood();
+    }
+  }
+
+  private _scrollToFirstGood(): void {
+    requestAnimationFrame(() => {
+      const list = this.shadowRoot?.querySelector<HTMLElement>(".options-list");
+      if (!list) return;
+      const target = list.querySelector<HTMLElement>(".sleep-option:not(.short)");
+      if (!target) return;
+      // getBoundingClientRect gives viewport-relative coords; the difference
+      // plus current scrollTop converts to scroll-container-relative offset.
+      const scrollTop =
+        target.getBoundingClientRect().top -
+        list.getBoundingClientRect().top +
+        list.scrollTop;
+      list.scrollTo({ top: scrollTop });
+    });
   }
 
   private get _fallAsleep(): number {
@@ -283,6 +310,8 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         --sleep-short-color: var(--secondary-text-color, #888);
         --sleep-good-color: var(--warning-color, #ff9800);
         --sleep-recommended-color: var(--success-color, #4caf50);
+        --option-height: 56px;
+        --option-gap: 6px;
       }
 
       ha-card {
@@ -422,7 +451,12 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
       .options-list {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--option-gap);
+        /* show exactly 3 rows; the rest scroll beneath */
+        height: calc(3 * var(--option-height) + 2 * var(--option-gap));
+        overflow-y: scroll;
+        scrollbar-width: thin;
+        scrollbar-color: var(--divider-color, rgba(0, 0, 0, 0.12)) transparent;
       }
 
       .sleep-option {
@@ -433,6 +467,10 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         border-radius: 8px;
         border-left: 4px solid transparent;
         background: var(--secondary-background-color, #f5f5f5);
+        /* fixed height so the container calculation is exact */
+        height: var(--option-height);
+        box-sizing: border-box;
+        flex-shrink: 0;
       }
 
       .sleep-option.short {
