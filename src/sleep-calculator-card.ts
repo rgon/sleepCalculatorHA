@@ -6,8 +6,8 @@ import {
   TemplateResult,
   nothing,
 } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import { HomeAssistant, LovelaceCard } from "custom-card-helpers";
+import { customElement, state } from "lit/decorators.js";
+import { LovelaceCard } from "custom-card-helpers";
 
 import type {
   SleepCalculatorCardConfig,
@@ -16,9 +16,9 @@ import type {
 } from "./types";
 
 // Register card for Home Assistant card picker
-(window as { customCards?: unknown[] }).customCards =
-  (window as { customCards?: unknown[] }).customCards || [];
-(window as { customCards?: unknown[] }).customCards!.push({
+const win = window as { customCards?: unknown[] };
+win.customCards = win.customCards || [];
+win.customCards.push({
   type: "sleep-calculator-card",
   name: "Sleep Calculator",
   description:
@@ -30,8 +30,10 @@ import type {
 
 const MAX_SLEEP_MINUTES = 600; // 10 hours
 
-/** Returns total sleep minutes (cycles × cycle_length) for which quality label applies. */
-function qualityLabel(cycles: number, cycleLength: number): "recommended" | "good" | "short" {
+function qualityLabel(
+  cycles: number,
+  cycleLength: number
+): "recommended" | "good" | "short" {
   const sleepMinutes = cycles * cycleLength;
   if (sleepMinutes >= 420 && sleepMinutes <= 540) return "recommended"; // 7–9 h
   if (sleepMinutes >= 360) return "good"; // 6–7 h
@@ -40,15 +42,12 @@ function qualityLabel(cycles: number, cycleLength: number): "recommended" | "goo
 
 @customElement("sleep-calculator-card")
 export class SleepCalculatorCard extends LitElement implements LovelaceCard {
-  @property({ attribute: false }) public hass!: HomeAssistant;
   @state() private _config!: SleepCalculatorCardConfig;
   @state() private _mode: CalculatorMode = "wakeup";
   @state() private _wakeTarget = "";
   @state() private _now: Date = new Date();
 
   private _ticker?: ReturnType<typeof setInterval>;
-
-  // ── LovelaceCard API ─────────────────────────────────────────────────────
 
   public setConfig(config: SleepCalculatorCardConfig): void {
     if (!config) throw new Error("Invalid configuration");
@@ -63,13 +62,13 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
     return 5;
   }
 
-  // ── Lifecycle ────────────────────────────────────────────────────────────
-
   public connectedCallback(): void {
     super.connectedCallback();
-    // Refresh current time every minute for wake-up mode
+    // Guard against double-registration on reconnect
+    if (this._ticker !== undefined) clearInterval(this._ticker);
     this._ticker = setInterval(() => {
-      this._now = new Date();
+      // Only re-render for the clock display in wakeup mode
+      if (this._mode === "wakeup") this._now = new Date();
     }, 60_000);
   }
 
@@ -78,14 +77,12 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
     if (this._ticker !== undefined) clearInterval(this._ticker);
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────────
-
   private get _fallAsleep(): number {
-    return this._config?.time_to_fall_asleep ?? 15;
+    return this._config.time_to_fall_asleep!;
   }
 
   private get _cycleLength(): number {
-    return this._config?.sleep_cycle_length ?? 90;
+    return this._config.sleep_cycle_length!;
   }
 
   private get _maxCycles(): number {
@@ -115,11 +112,12 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
     // If the chosen time has already passed today, move to tomorrow
     if (wake <= this._now) wake.setDate(wake.getDate() + 1);
 
-    // Generate from most sleep (max cycles) down to 1 cycle
+    // Most sleep first (max cycles → 1 cycle)
     return Array.from({ length: this._maxCycles }, (_, i) => {
       const cycles = this._maxCycles - i;
-      const sleepTime = new Date(wake.getTime() - cycles * this._cycleLength * 60_000);
-      const bedTime = new Date(sleepTime.getTime() - this._fallAsleep * 60_000);
+      const bedTime = new Date(
+        wake.getTime() - (this._fallAsleep + cycles * this._cycleLength) * 60_000
+      );
       return {
         time: bedTime,
         cycles,
@@ -129,11 +127,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
   }
 
   private _fmt(date: Date): string {
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   private _fmtDuration(minutes: number): string {
@@ -142,7 +136,18 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   }
 
-  // ── Render helpers ────────────────────────────────────────────────────────
+  private readonly _onSetModeWakeup = () => {
+    this._now = new Date(); // refresh stale clock when switching back
+    this._mode = "wakeup";
+  };
+
+  private readonly _onSetModeBedtime = () => {
+    this._mode = "bedtime";
+  };
+
+  private readonly _onWakeTargetChange = (e: Event) => {
+    this._wakeTarget = (e.target as HTMLInputElement).value;
+  };
 
   private _renderOption(opt: SleepOption): TemplateResult {
     const q = qualityLabel(opt.cycles, this._cycleLength);
@@ -150,9 +155,9 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
       <div class="sleep-option ${q}">
         <div class="opt-time">${this._fmt(opt.time)}</div>
         <div class="opt-meta">
-          <span class="cycles">
-            ${opt.cycles} cycle${opt.cycles !== 1 ? "s" : ""}
-          </span>
+          <span class="cycles"
+            >${opt.cycles} cycle${opt.cycles !== 1 ? "s" : ""}</span
+          >
           <span class="duration">${this._fmtDuration(opt.totalMinutes)}</span>
         </div>
         ${q === "recommended"
@@ -190,9 +195,7 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
             id="wake-input"
             type="time"
             .value=${this._wakeTarget}
-            @change=${(e: Event) => {
-              this._wakeTarget = (e.target as HTMLInputElement).value;
-            }}
+            @change=${this._onWakeTargetChange}
           />
         </div>
         ${opts.length > 0
@@ -222,13 +225,12 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         </div>
 
         <div class="card-content">
-          <!-- Mode selector -->
           <div class="mode-selector" role="tablist">
             <button
               role="tab"
               class="mode-btn ${this._mode === "wakeup" ? "active" : ""}"
               aria-selected=${this._mode === "wakeup"}
-              @click=${() => { this._mode = "wakeup"; }}
+              @click=${this._onSetModeWakeup}
             >
               <ha-icon icon="mdi:alarm"></ha-icon>
               Wake-up times
@@ -237,19 +239,17 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
               role="tab"
               class="mode-btn ${this._mode === "bedtime" ? "active" : ""}"
               aria-selected=${this._mode === "bedtime"}
-              @click=${() => { this._mode = "bedtime"; }}
+              @click=${this._onSetModeBedtime}
             >
               <ha-icon icon="mdi:bed-clock"></ha-icon>
               Bedtime
             </button>
           </div>
 
-          <!-- Mode content -->
           ${this._mode === "wakeup"
             ? this._renderWakeupMode()
             : this._renderBedtimeMode()}
 
-          <!-- Config footer -->
           <div class="config-footer">
             <ha-icon icon="mdi:information-outline"></ha-icon>
             Cycle ${this._cycleLength} min · Fall asleep ${this._fallAsleep} min
@@ -258,8 +258,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
       </ha-card>
     `;
   }
-
-  // ── Styles ────────────────────────────────────────────────────────────────
 
   static get styles(): CSSResultGroup {
     return css`
@@ -295,7 +293,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         gap: 12px;
       }
 
-      /* ── Mode selector ── */
       .mode-selector {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -329,7 +326,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         color: var(--primary-text-color);
       }
 
-      /* ── Current time box (wakeup mode) ── */
       .current-time-box {
         display: flex;
         align-items: center;
@@ -368,7 +364,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         color: var(--secondary-text-color);
       }
 
-      /* ── Wake time input (bedtime mode) ── */
       .wake-input-box {
         display: flex;
         align-items: center;
@@ -397,7 +392,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         border-color: var(--primary-color);
       }
 
-      /* ── Options list ── */
       .options-heading {
         font-size: 0.75rem;
         text-transform: uppercase;
@@ -420,7 +414,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         border-radius: 8px;
         border-left: 4px solid transparent;
         background: var(--secondary-background-color, #f5f5f5);
-        position: relative;
       }
 
       .sleep-option.short {
@@ -473,7 +466,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         border-radius: 20px;
       }
 
-      /* ── Placeholder ── */
       .placeholder {
         text-align: center;
         color: var(--secondary-text-color);
@@ -482,7 +474,6 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         font-style: italic;
       }
 
-      /* ── Config footer ── */
       .config-footer {
         display: flex;
         align-items: center;
