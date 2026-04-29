@@ -4,6 +4,8 @@ A Home Assistant Lovelace custom card that calculates optimal sleep and wake-up 
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
 
+![Sleep Calculator Card screenshot](docs/screenshot.png)
+
 ---
 
 ## Features
