@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sleep Calculator Card — Demo</title>
+  <style>
+    /* ── Page chrome ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      background: var(--page-bg, #e8e8e8);
+      color: var(--primary-text-color, #212121);
+      transition: background 0.25s, color 0.25s;
+      padding: 32px 16px;
+    }
+
+    .page-header {
+      max-width: 900px;
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      opacity: 0.7;
+      letter-spacing: 0.03em;
+    }
+
+    #theme-toggle {
+      padding: 8px 18px;
+      border: 1px solid var(--divider-color, rgba(0,0,0,0.2));
+      border-radius: 20px;
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color, #212121);
+      font-size: 0.85rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    #theme-toggle:hover { opacity: 0.8; }
+
+    .cards-row {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .card-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.5;
+      padding-left: 4px;
+    }
+
+    /* ── Light theme ── */
+    :root {
+      --page-bg: #e8e8e8;
+
+      /* card */
+      --ha-card-background:          #ffffff;
+      --card-background-color:       #ffffff;
+      --ha-card-border-radius:       12px;
+      --ha-card-box-shadow:          0 2px 8px rgba(0,0,0,0.14);
+
+      /* text */
+      --primary-text-color:          #212121;
+      --secondary-text-color:        #727272;
+      --text-primary-color:          #ffffff;
+
+      /* surfaces */
+      --secondary-background-color:  #f5f5f5;
+      --divider-color:               rgba(0,0,0,0.12);
+
+      /* accent */
+      --primary-color:               #03a9f4;
+
+      /* card header */
+      --ha-card-header-font-size:    22px;
+      --ha-card-header-font-weight:  normal;
+      --ha-card-header-color:        var(--primary-text-color);
+
+      /* status colours */
+      --warning-color:               #ff9800;
+      --success-color:               #4caf50;
+    }
+
+    /* ── Dark theme ── */
+    :root.dark {
+      --page-bg: #111111;
+
+      --ha-card-background:          #1c1c1e;
+      --card-background-color:       #1c1c1e;
+
+      --primary-text-color:          #e1e1e1;
+      --secondary-text-color:        #9e9e9e;
+      --text-primary-color:          #ffffff;
+
+      --secondary-background-color:  #2c2c2e;
+      --divider-color:               rgba(255,255,255,0.12);
+
+      --primary-color:               #29b6f6;
+
+      --ha-card-header-color:        var(--primary-text-color);
+
+      --warning-color:               #ffa726;
+      --success-color:               #66bb6a;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <span class="page-title">sleep-calculator-card · dev demo</span>
+    <button id="theme-toggle">Switch to Dark</button>
+  </header>
+
+  <div class="cards-row">
+    <div class="card-wrapper">
+      <span class="card-label">Default config</span>
+      <sleep-calculator-card id="card-default"></sleep-calculator-card>
+    </div>
+    <div class="card-wrapper">
+      <span class="card-label">Custom config — 20 min fall-asleep · 110 min cycles</span>
+      <sleep-calculator-card id="card-custom"></sleep-calculator-card>
+    </div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    // Mock HA web components — must be defined BEFORE the card module
+    // is imported so that the card's shadow DOM render finds them.
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * <ha-card> — styled container that mirrors HA's card appearance.
+     * Uses CSS custom properties already declared on :root so both
+     * light and dark themes work automatically.
+     */
+    class HaCard extends HTMLElement {
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            :host {
+              display: block;
+              background: var(--ha-card-background, var(--card-background-color, #fff));
+              border-radius: var(--ha-card-border-radius, 12px);
+              box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0,0,0,0.14));
+              overflow: hidden;
+              transition: background 0.25s;
+            }
+          </style>
+          <slot></slot>
+        `;
+      }
+    }
+
+    /**
+     * <ha-icon icon="mdi:xxx"> — delegates to Iconify's <iconify-icon>
+     * which accepts the same "mdi:icon-name" format natively.
+     * Size is driven by --mdc-icon-size (same custom property HA uses).
+     */
+    class HaIcon extends HTMLElement {
+      static get observedAttributes() { return ['icon']; }
+
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+          <style>
+            :host {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width:  var(--mdc-icon-size, 24px);
+              height: var(--mdc-icon-size, 24px);
+            }
+            iconify-icon {
+              font-size: var(--mdc-icon-size, 24px);
+              width:  var(--mdc-icon-size, 24px);
+              height: var(--mdc-icon-size, 24px);
+            }
+          </style>
+          <iconify-icon></iconify-icon>
+        `;
+        this._iconEl = shadow.querySelector('iconify-icon');
+      }
+
+      attributeChangedCallback(name, _old, value) {
+        if (name === 'icon' && this._iconEl) {
+          this._iconEl.setAttribute('icon', value || '');
+        }
+      }
+
+      connectedCallback() {
+        const icon = this.getAttribute('icon');
+        if (icon && this._iconEl) {
+          this._iconEl.setAttribute('icon', icon);
+        }
+      }
+    }
+
+    customElements.define('ha-card', HaCard);
+    customElements.define('ha-icon', HaIcon);
+  </script>
+
+  <!-- Iconify CDN for real MDI icon rendering -->
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+
+  <!-- Card module — imported after mocks are registered -->
+  <script type="module">
+    import './sleep-calculator-card.js';
+
+    // setConfig must be called after the element is upgraded
+    await customElements.whenDefined('sleep-calculator-card');
+
+    document.getElementById('card-default').setConfig({});
+
+    document.getElementById('card-custom').setConfig({
+      title: 'Custom Cycles',
+      time_to_fall_asleep: 20,
+      sleep_cycle_length: 110,
+    });
+  </script>
+
+  <!-- Theme toggle -->
+  <script>
+    const toggle = document.getElementById('theme-toggle');
+    toggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      toggle.textContent = isDark ? 'Switch to Light' : 'Switch to Dark';
+    });
+  </script>
+
+  <!-- livereload client — served by rollup-plugin-livereload during `pnpm start`; ignored otherwise -->
+  <script src="http://localhost:35729/livereload.js?snipver=1"></script>
+
+</body>
+</html>

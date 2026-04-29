@@ -3,6 +3,8 @@ import commonjs from "@rollup/plugin-commonjs";
 import resolve from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import json from "@rollup/plugin-json";
+import serve from "rollup-plugin-serve";
+import livereload from "rollup-plugin-livereload";
 
 const dev = process.env.ROLLUP_WATCH;
 
@@ -20,6 +22,15 @@ export default {
     json(),
     typescript(),
     !dev && terser(),
+    dev &&
+      serve({
+        open: true,
+        openPage: "/demo.html",
+        host: "localhost",
+        port: 8080,
+        contentBase: ".",
+      }),
+    dev && livereload({ watch: "sleep-calculator-card.js", port: 35729 }),
   ].filter(Boolean),
   onwarn(warning, warn) {
     // Suppress circular dependency warnings from lit
