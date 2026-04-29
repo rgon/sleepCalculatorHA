@@ -415,7 +415,8 @@ export class SleepCalculatorCard extends LitElement implements LovelaceCard {
         text-transform: uppercase;
         letter-spacing: 0.07em;
         color: var(--secondary-text-color);
-        margin-bottom: -4px;
+        margin-bottom: 4px;
+        margin-top: 4px;
       }
 
       .options-list {
